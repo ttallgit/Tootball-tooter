@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tootball Tooter - How to Play</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>HOW TO PLAY</h1>
+
+        <div class="instructions-box">
+            <div class="instruction-section">
+                <h3>CONTROLS</h3>
+                <p>↑ : Run Forward</p>
+                <p>← → ↓ : Choose Shot Direction</p>
+                <p>SPACE : Shoot</p>
+            </div>
+
+            <div class="instruction-section">
+                <h3>THE ARROW</h3>
+                <p>A flashing arrow shows which way the goalkeeper will dive.</p>
+                <p>You must shoot in the OPPOSITE direction to score!</p>
+            </div>
+
+            <div class="instruction-section">
+                <h3>TIMING</h3>
+                <p>Press direction + SPACE at the EXACT same time (within 15ms).</p>
+                <p>You have 500ms after "SHOOT!" to press the buttons.</p>
+            </div>
+
+            <div class="instruction-section" id="hard-mode-info" style="display: none;">
+                <h3>HARD MODE</h3>
+                <p>Arrow can also point UP (center shot).</p>
+                <p>Press ↓ + SPACE to shoot the opposite way!</p>
+                <p>The goalkeeper stays center when arrow points up.</p>
+            </div>
+
+            <div class="instruction-section">
+                <h3>EXAMPLES</h3>
+                <div class="example-row">
+                    <span class="arrow-example">←</span>
+                    <span>Shoot → + SPACE = GOAL!</span>
+                </div>
+                <div class="example-row">
+                    <span class="arrow-example">→</span>
+                    <span>Shoot ← + SPACE = GOAL!</span>
+                </div>
+                <div class="example-row" id="down-example" style="display: none;">
+                    <span class="arrow-example">↑</span>
+                    <span>Shoot ↓ + SPACE = GOAL!</span>
+                </div>
+            </div>
+
+            <button class="start-btn" id="continue-btn">CONTINUE</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const mode = localStorage.getItem('gameMode') || 'normal';
+            const continueBtn = document.getElementById('continue-btn');
+            const hardModeInfo = document.getElementById('hard-mode-info');
+            const downExample = document.getElementById('down-example');
+
+            if (mode === 'hard') {
+                hardModeInfo.style.display = 'block';
+                downExample.style.display = 'flex';
+            }
+
+            continueBtn.addEventListener('click', () => {
+                window.location.href = 'game.html';
+            });
+        });
+    </script>
+</body>
+</html>
