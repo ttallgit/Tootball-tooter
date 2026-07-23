@@ -6,10 +6,13 @@ class Player {
         this.size = 40;
         this.tigerData = null;
         this.running = false;
+
+        this.aimX = GAME_SETTINGS.goalCenterX;
+        this.aimY = GAME_SETTINGS.goalCenterY;
+        this.aimVx = 0;
+        this.aimVy = 0;
+
         this.keys = { left: false, right: false, up: false, down: false, space: false };
-        this.lastDirectionPress = null;
-        this.lastSpacePress = null;
-        this.canShoot = false;
         this._setupListeners();
     }
 
@@ -19,42 +22,11 @@ class Player {
 
     _setupListeners() {
         window.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                this.keys.left = true;
-                if (this.canShoot && !e.repeat) {
-                    this.lastDirectionPress = { direction: 'left', time: performance.now() };
-                    this._checkIfSpaceHeld();
-                }
-            }
-            if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                this.keys.right = true;
-                if (this.canShoot && !e.repeat) {
-                    this.lastDirectionPress = { direction: 'right', time: performance.now() };
-                    this._checkIfSpaceHeld();
-                }
-            }
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                this.keys.up = true;
-            }
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                this.keys.down = true;
-                if (this.canShoot && !e.repeat) {
-                    this.lastDirectionPress = { direction: 'down', time: performance.now() };
-                    this._checkIfSpaceHeld();
-                }
-            }
-            if (e.key === ' ') {
-                e.preventDefault();
-                this.keys.space = true;
-                if (!e.repeat) {
-                    this.lastSpacePress = performance.now();
-                    this._checkIfDirectionHeld();
-                }
-            }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); this.keys.left = true; }
+            if (e.key === 'ArrowRight') { e.preventDefault(); this.keys.right = true; }
+            if (e.key === 'ArrowUp') { e.preventDefault(); this.keys.up = true; }
+            if (e.key === 'ArrowDown') { e.preventDefault(); this.keys.down = true; }
+            if (e.key === ' ') { e.preventDefault(); this.keys.space = true; }
         });
 
         window.addEventListener('keyup', (e) => {
@@ -66,48 +38,21 @@ class Player {
         });
     }
 
-    _checkIfSpaceHeld() {
-        if (this.keys.space && !this.lastSpacePress) {
-            this.lastSpacePress = performance.now();
-        }
-    }
-
-    _checkIfDirectionHeld() {
-        if (!this.lastDirectionPress) {
-            if (this.keys.left) {
-                this.lastDirectionPress = { direction: 'left', time: performance.now() };
-            } else if (this.keys.right) {
-                this.lastDirectionPress = { direction: 'right', time: performance.now() };
-            } else if (this.keys.down) {
-                this.lastDirectionPress = { direction: 'down', time: performance.now() };
-            }
-        }
-    }
-
     reset() {
         this.x = GAME_SETTINGS.canvasWidth / 2;
         this.y = GAME_SETTINGS.penaltySpotY;
         this.targetX = this.x;
         this.running = false;
-        this.lastDirectionPress = null;
-        this.lastSpacePress = null;
+        this.aimX = GAME_SETTINGS.goalCenterX;
+        this.aimY = GAME_SETTINGS.goalCenterY;
+        this.aimVx = 0;
+        this.aimVy = 0;
         this.keys = { left: false, right: false, up: false, down: false, space: false };
-        this.canShoot = false;
     }
 
-    enableShooting() {
-        this.canShoot = true;
-        this.lastDirectionPress = null;
-        this.lastSpacePress = null;
-    }
-
-    update() {
-        if (this.keys.left) {
-            this.targetX -= GAME_SETTINGS.moveSpeed;
-        }
-        if (this.keys.right) {
-            this.targetX += GAME_SETTINGS.moveSpeed;
-        }
+    updateRun() {
+        if (this.keys.left) this.targetX -= GAME_SETTINGS.strafeSpeed;
+        if (this.keys.right) this.targetX += GAME_SETTINGS.strafeSpeed;
 
         const minX = (GAME_SETTINGS.canvasWidth - GAME_SETTINGS.goalWidth) / 2 + 20;
         const maxX = (GAME_SETTINGS.canvasWidth + GAME_SETTINGS.goalWidth) / 2 - 20;
@@ -118,23 +63,44 @@ class Player {
             this.running = true;
             this.y -= GAME_SETTINGS.runSpeed;
         }
-
-        return this.running && this.y <= GAME_SETTINGS.goalY + GAME_SETTINGS.goalHeight + 80;
     }
 
-    checkShotTiming() {
-        if (!this.lastDirectionPress || !this.lastSpacePress) {
-            return { timed: false, direction: null };
+    updateAim() {
+        const s = GAME_SETTINGS;
+
+        if (this.keys.left) this.aimVx -= s.aimAccel;
+        if (this.keys.right) this.aimVx += s.aimAccel;
+        if (this.keys.up) this.aimVy -= s.aimAccel;
+        if (this.keys.down) this.aimVy += s.aimAccel;
+
+        if (!this.keys.left && !this.keys.right) this.aimVx *= s.aimFriction;
+        if (!this.keys.up && !this.keys.down) this.aimVy *= s.aimFriction;
+
+        const speed = Math.sqrt(this.aimVx * this.aimVx + this.aimVy * this.aimVy);
+        if (speed > s.aimMaxSpeed) {
+            this.aimVx = (this.aimVx / speed) * s.aimMaxSpeed;
+            this.aimVy = (this.aimVy / speed) * s.aimMaxSpeed;
         }
 
-        const timeDiff = Math.abs(this.lastDirectionPress.time - this.lastSpacePress);
-        const tolerance = GAME_SETTINGS.hardMode ? GAME_SETTINGS.hardTimingToleranceMs : GAME_SETTINGS.timingToleranceMs;
-        const timed = timeDiff <= tolerance;
+        this.aimX += this.aimVx;
+        this.aimY += this.aimVy;
 
-        return { timed, direction: this.lastDirectionPress.direction };
+        this.aimX += Math.sin(performance.now() / 137) * s.aimJitter;
+        this.aimY += Math.cos(performance.now() / 151) * s.aimJitter;
+
+        this.aimX = Math.max(s.goalLeft, Math.min(s.goalRight, this.aimX));
+        this.aimY = Math.max(s.goalTop, Math.min(s.goalBottom, this.aimY));
+
+        if (this.aimX <= s.goalLeft && this.aimVx < 0) this.aimVx = 0;
+        if (this.aimX >= s.goalRight && this.aimVx > 0) this.aimVx = 0;
+        if (this.aimY <= s.goalTop && this.aimVy < 0) this.aimVy = 0;
+        if (this.aimY >= s.goalBottom && this.aimVy > 0) this.aimVy = 0;
     }
 
-    isAtShootingPosition() {
-        return this.y <= GAME_SETTINGS.goalY + GAME_SETTINGS.goalHeight + 80;
+    resetAim() {
+        this.aimX = GAME_SETTINGS.goalCenterX;
+        this.aimY = GAME_SETTINGS.goalCenterY;
+        this.aimVx = 0;
+        this.aimVy = 0;
     }
 }

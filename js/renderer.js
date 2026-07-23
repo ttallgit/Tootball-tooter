@@ -45,7 +45,6 @@ class Renderer {
         ctx.stroke();
 
         const spotY = horizon + (groundBottom - horizon) * 0.75;
-        const spotScale = (spotY - horizon) / (groundBottom - horizon);
         const spotX = this.w / 2;
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
         ctx.beginPath();
@@ -84,7 +83,7 @@ class Renderer {
         ctx.fillRect(goalX, goalY, goalW, goalH);
     }
 
-    drawTiger(x, y, size, tigerData, facing = 'up') {
+    drawTiger(x, y, size, tigerData) {
         const ctx = this.ctx;
         const scale = size / 40;
 
@@ -178,39 +177,78 @@ class Renderer {
         }
     }
 
-    drawArrow(direction, x, y, visible) {
-        if (!visible) return;
+    drawCrosshair(x, y) {
         const ctx = this.ctx;
-        const arrowSize = 40;
-        const alpha = 0.5 + 0.5 * Math.sin(Date.now() / 80);
+        const size = 12;
 
         ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = '#FF4444';
-        ctx.strokeStyle = '#FF0000';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#FF4444';
+        ctx.lineWidth = 2;
 
         ctx.beginPath();
-        if (direction === 'left') {
-            ctx.moveTo(x - arrowSize, y);
-            ctx.lineTo(x, y + arrowSize * 0.5);
-            ctx.lineTo(x - arrowSize * 0.4, y);
-            ctx.lineTo(x, y - arrowSize * 0.5);
-        } else if (direction === 'right') {
-            ctx.moveTo(x + arrowSize, y);
-            ctx.lineTo(x, y + arrowSize * 0.5);
-            ctx.lineTo(x + arrowSize * 0.4, y);
-            ctx.lineTo(x, y - arrowSize * 0.5);
-        } else if (direction === 'up') {
-            ctx.moveTo(x, y - arrowSize);
-            ctx.lineTo(x - arrowSize * 0.5, y);
-            ctx.lineTo(x, y - arrowSize * 0.4);
-            ctx.lineTo(x + arrowSize * 0.5, y);
-        }
-        ctx.closePath();
-        ctx.fill();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
         ctx.stroke();
 
+        ctx.beginPath();
+        ctx.moveTo(x - size - 4, y);
+        ctx.lineTo(x + size + 4, y);
+        ctx.moveTo(x, y - size - 4);
+        ctx.lineTo(x, y + size + 4);
+        ctx.stroke();
+
+        ctx.fillStyle = '#FF4444';
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    drawPowerBar(x, y, power, visible) {
+        if (!visible) return;
+        const ctx = this.ctx;
+        const barWidth = 200;
+        const barHeight = 22;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(x - barWidth / 2 - 2, y - 2, barWidth + 4, barHeight + 4);
+
+        const color = power > 0.8 ? '#4CAF50' : power > 0.45 ? '#FFD700' : '#f44336';
+        ctx.fillStyle = color;
+        ctx.fillRect(x - barWidth / 2, y, barWidth * power, barHeight);
+
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x - barWidth / 2 - 2, y - 2, barWidth + 4, barHeight + 4);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(Math.round(power * 100) + '%', x, y + 15);
+        ctx.restore();
+    }
+
+    drawGoalZones(keeperDiveDirection) {
+        const ctx = this.ctx;
+        const g = GAME_SETTINGS;
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+
+        let zoneCenter, zoneW = 35;
+        if (keeperDiveDirection === 'center') {
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(g.goalCenterX - 70, g.goalTop, 140, g.goalHeight);
+        } else if (keeperDiveDirection === 'left') {
+            ctx.fillStyle = '#FF4444';
+            ctx.fillRect(g.goalLeft, g.goalTop, 140, g.goalHeight);
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(g.goalRight - zoneW, g.goalTop, zoneW, g.goalHeight);
+        } else if (keeperDiveDirection === 'right') {
+            ctx.fillStyle = '#FF4444';
+            ctx.fillRect(g.goalRight - 140, g.goalTop, 140, g.goalHeight);
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(g.goalLeft, g.goalTop, zoneW, g.goalHeight);
+        }
         ctx.restore();
     }
 
@@ -227,18 +265,20 @@ class Renderer {
 
         if (message) {
             ctx.fillStyle = 'rgba(0,0,0,0.8)';
-            ctx.fillRect(this.w / 2 - 150, this.h / 2 - 40, 300, 80);
+            ctx.fillRect(this.w / 2 - 180, this.h / 2 - 45, 360, 90);
 
-            ctx.font = 'bold 28px monospace';
+            ctx.font = 'bold 32px monospace';
             ctx.textAlign = 'center';
             if (messageType === 'goal') {
                 ctx.fillStyle = '#4CAF50';
             } else if (messageType === 'save') {
                 ctx.fillStyle = '#f44336';
+            } else if (messageType === 'miss') {
+                ctx.fillStyle = '#FF9800';
             } else {
                 ctx.fillStyle = '#fff';
             }
-            ctx.fillText(message, this.w / 2, this.h / 2 + 10);
+            ctx.fillText(message, this.w / 2, this.h / 2 + 12);
             ctx.textAlign = 'left';
         }
     }
@@ -246,32 +286,13 @@ class Renderer {
     drawControls() {
         const ctx = this.ctx;
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(this.w - 210, this.h - 80, 200, 70);
+        ctx.fillRect(this.w - 230, this.h - 90, 220, 80);
         ctx.fillStyle = '#fff';
-        ctx.font = '12px monospace';
-        ctx.fillText('↑ : Run Forward', this.w - 200, this.h - 55);
-        ctx.fillText('← → : Move Side', this.w - 200, this.h - 38);
-        ctx.fillText('SPACE : Shoot', this.w - 200, this.h - 21);
-    }
-
-    drawTimingIndicator(success) {
-        const ctx = this.ctx;
-        const x = this.w / 2;
-        const y = this.h - 30;
-
-        if (success === true) {
-            ctx.fillStyle = '#4CAF50';
-            ctx.font = 'bold 16px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('PERFECT TIMING!', x, y);
-            ctx.textAlign = 'left';
-        } else if (success === false) {
-            ctx.fillStyle = '#f44336';
-            ctx.font = 'bold 16px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('MISTIMED!', x, y);
-            ctx.textAlign = 'left';
-        }
+        ctx.font = '11px monospace';
+        ctx.fillText('↑ : Run Forward', this.w - 220, this.h - 65);
+        ctx.fillText('← → ↑ ↓ : Aim', this.w - 220, this.h - 48);
+        ctx.fillText('SPACE : Charge & Shoot', this.w - 220, this.h - 31);
+        ctx.fillText('Release SPACE to fire', this.w - 220, this.h - 14);
     }
 
     drawShootTimer(progress) {
@@ -343,5 +364,3 @@ class Renderer {
         ctx.restore();
     }
 }
-
-const renderer = null;

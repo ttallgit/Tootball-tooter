@@ -16,43 +16,39 @@
             <div class="instruction-section">
                 <h3>CONTROLS</h3>
                 <p>↑ : Run Forward</p>
-                <p>← → ↓ : Choose Shot Direction</p>
-                <p>SPACE : Shoot</p>
+                <p>← → ↑ ↓ : Move Crosshair</p>
+                <p>SPACE (hold) : Charge Power</p>
+                <p>SPACE (release) : Shoot</p>
             </div>
 
             <div class="instruction-section">
-                <h3>THE ARROW</h3>
-                <p>A flashing arrow shows which way the goalkeeper will dive.</p>
-                <p>You must shoot in the OPPOSITE direction to score!</p>
+                <h3>PLACEMENT</h3>
+                <p>Use arrow keys to aim the crosshair within the goal.</p>
+                <p>The crosshair has inertia — it keeps moving after you release.</p>
+                <p>Aim for corners or opposite side of the keeper's dive.</p>
             </div>
 
             <div class="instruction-section">
-                <h3>TIMING</h3>
-                <p>Press direction + SPACE at the EXACT same time (within 15ms).</p>
-                <p>You have 500ms after "SHOOT!" to press the buttons.</p>
-            </div>
-
-            <div class="instruction-section" id="hard-mode-info" style="display: none;">
-                <h3>HARD MODE</h3>
-                <p>Arrow can also point UP (center shot).</p>
-                <p>Press ↓ + SPACE to shoot the opposite way!</p>
-                <p>The goalkeeper stays center when arrow points up.</p>
+                <h3>POWER</h3>
+                <p>Hold SPACE to charge — the power bar oscillates up and down.</p>
+                <p>Release at the right moment for your desired power level.</p>
+                <p>More power = faster shot (harder for keeper) but less accurate.</p>
+                <p>Less power = more accurate but keeper has more time to save.</p>
             </div>
 
             <div class="instruction-section">
-                <h3>EXAMPLES</h3>
-                <div class="example-row">
-                    <span class="arrow-example">←</span>
-                    <span>Shoot → + SPACE = GOAL!</span>
-                </div>
-                <div class="example-row">
-                    <span class="arrow-example">→</span>
-                    <span>Shoot ← + SPACE = GOAL!</span>
-                </div>
-                <div class="example-row" id="down-example" style="display: none;">
-                    <span class="arrow-example">↑</span>
-                    <span>Shoot ↓ + SPACE = GOAL!</span>
-                </div>
+                <h3>THE KEEPER</h3>
+                <p>The keeper dives LEFT, CENTER, or RIGHT — you don't know which!</p>
+                <p>Shots close to the keeper's dive are saved.</p>
+                <p>Shots to the opposite side or tight corners beat the keeper.</p>
+                <p>Top and bottom corners are harder for the keeper to reach.</p>
+            </div>
+
+            <div class="instruction-section">
+                <h3>KEEPER LEARNING</h3>
+                <p>The keeper watches where you aim and learns your tendencies.</p>
+                <p>Go to the same spot too many times and the keeper will predict it.</p>
+                <p>Mix up your placement to keep the keeper guessing!</p>
             </div>
 
             <button class="start-btn" id="continue-btn">CONTINUE</button>
@@ -61,16 +57,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const mode = localStorage.getItem('gameMode') || 'normal';
             const continueBtn = document.getElementById('continue-btn');
-            const hardModeInfo = document.getElementById('hard-mode-info');
-            const downExample = document.getElementById('down-example');
-
-            if (mode === 'hard') {
-                hardModeInfo.style.display = 'block';
-                downExample.style.display = 'flex';
-            }
-
             continueBtn.addEventListener('click', () => {
                 window.location.href = 'game.html';
             });

@@ -8,8 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedMode = 'normal';
 
     const modeDescriptions = {
-        normal: 'Arrow shows LEFT or RIGHT. Shoot the opposite way!',
-        hard: 'Arrow can show LEFT, RIGHT, or UP. Up arrow = center shot!'
+        normal: 'Normal keeper reaction. Standard power and aim. Fair learning.',
+        hard: 'Faster keeper. Less aim stability. Shorter time limit. Keeper learns quicker.'
     };
 
     normalBtn.addEventListener('click', () => {
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!selectedTiger) return;
         localStorage.setItem('selectedTiger', JSON.stringify(selectedTiger));
         localStorage.setItem('gameMode', selectedMode);
-        window.location.href = 'instructions.html';
+        window.location.href = 'game.html';
     });
 
     function drawTigerPreview(ctx, x, y, scale, tigerData) {

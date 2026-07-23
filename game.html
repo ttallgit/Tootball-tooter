@@ -61,6 +61,13 @@
             }
 
             GAME_SETTINGS.hardMode = gameMode === 'hard';
+            if (GAME_SETTINGS.hardMode) {
+                GAME_SETTINGS.keeperLearningRate = 0.55;
+                GAME_SETTINGS.keeperNoise = 0.08;
+                GAME_SETTINGS.keeperReachH = 82;
+                GAME_SETTINGS.aimJitter = 0.6;
+                GAME_SETTINGS.aimingTimeLimit = 3000;
+            }
             modeBadge.textContent = gameMode.toUpperCase();
 
             audioManager.init();

@@ -9,14 +9,6 @@ const TIGERS = [
 const GAME_SETTINGS = {
     shotsPerRound: 5,
     winScore: 5,
-    timingToleranceMs: 30,
-    hardTimingToleranceMs: 15,
-    goalkeeperRevealTimeMs: 800,
-    goalkeeperDiveTimeMs: 400,
-    ballSpeed: 12,
-    runSpeed: 1.5,
-    moveSpeed: 4,
-    countdownIntervalMs: 600,
     canvasWidth: 800,
     canvasHeight: 600,
     goalWidth: 300,
@@ -24,13 +16,46 @@ const GAME_SETTINGS = {
     goalY: 80,
     penaltySpotY: 480,
     groundY: 520,
-    hardMode: true
+    hardMode: false,
+
+    goalLeft: (800 - 300) / 2,
+    goalRight: (800 + 300) / 2,
+    goalTop: 80,
+    goalBottom: 200,
+    goalCenterX: 400,
+    goalCenterY: 140,
+
+    runSpeed: 1.5,
+    strafeSpeed: 3,
+
+    aimAccel: 0.45,
+    aimFriction: 0.88,
+    aimMaxSpeed: 3.5,
+    aimJitter: 0.4,
+
+    powerOscillateSpeed: 5.5,
+    aimingTimeLimit: 4000,
+    minChargeMs: 80,
+
+    keeperReachH: 75,
+    keeperReachV: 50,
+    keeperPowerReachFactor: 1.5,
+    keeperDiveDist: 100,
+    keeperLearningRate: 0.35,
+    keeperNoise: 0.2,
+
+    dispersionMinPx: 3,
+    dispersionPowerFactor: 6,
+
+    ballAnimMs: 320,
+    resultDelayMs: 1800,
+    countdownIntervalMs: 600,
 };
 
 const STATES = {
     READY: 'ready',
     RUNNING: 'running',
-    SHOOTING: 'shooting',
+    AIMING: 'aiming',
     RESULT: 'result',
     GAME_OVER: 'game_over'
 };

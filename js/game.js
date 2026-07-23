@@ -17,20 +17,25 @@ class Game {
         this.countdown = 3;
         this.countdownTimer = 0;
         this.countdownActive = false;
-        this.arrowShown = false;
 
-        this.arrowDirection = null;
-        this.arrowVisible = false;
+        this.power = 0;
+        this.powerCharging = false;
+        this.chargeStartTime = 0;
 
-        this.goalkeeperDiving = false;
-        this.shotResult = null;
-        this.shootWindowOpen = false;
+        this.aimingStartTime = 0;
+        this.resultMessageShown = false;
+
+        this.pendingResult = null;
+        this.pendingMessage = '';
+        this.pendingMessageType = '';
         this.shotResolved = false;
 
         this.shotHistory = [];
         this.animationFrameId = null;
-        this.shootWindowStart = 0;
-        this.shootTimeLimit = 500;
+        this.lastShotPower = 0;
+
+        this.h = GAME_SETTINGS.canvasHeight;
+        this.w = GAME_SETTINGS.canvasWidth;
     }
 
     start(tigerData) {
@@ -40,6 +45,7 @@ class Game {
         }
 
         this.player.setTiger(tigerData);
+        this.goalkeeper.resetLearning();
         this.score = 0;
         this.shots = 0;
         this.shotHistory = [];
@@ -70,15 +76,19 @@ class Game {
         this.countdown = 3;
         this.countdownTimer = 0;
         this.countdownActive = false;
-        this.arrowShown = false;
 
-        this.arrowDirection = null;
-        this.arrowVisible = false;
+        this.power = 0;
+        this.powerCharging = false;
+        this.chargeStartTime = 0;
 
-        this.goalkeeperDiving = false;
-        this.shotResult = null;
-        this.shootWindowOpen = false;
+        this.aimingStartTime = 0;
+        this.resultMessageShown = false;
         this.shotResolved = false;
+
+        this.pendingResult = null;
+        this.pendingMessage = '';
+        this.pendingMessageType = '';
+        this.lastShotPower = 0;
 
         this.state = STATES.READY;
         this.message = '';
@@ -95,25 +105,46 @@ class Game {
         this._resetShot();
     }
 
-    _showMessage(text, type, duration = 1500) {
+    _showMessage(text, type, duration) {
         this.message = text;
         this.messageType = type;
-        this.messageTimer = Date.now() + duration;
+        this.messageTimer = Date.now() + (duration || 1500);
+    }
+
+    _displayResultMessage() {
+        this._showMessage(this.pendingMessage, this.pendingMessageType, GAME_SETTINGS.resultDelayMs);
+    }
+
+    _getZone(x) {
+        const third = GAME_SETTINGS.goalWidth / 3;
+        const relX = x - GAME_SETTINGS.goalLeft;
+        if (relX < third) return 'left';
+        if (relX < third * 2) return 'center';
+        return 'right';
     }
 
     _update() {
         this.renderer.updateConfetti();
 
         if (this.state === STATES.RESULT) {
-            if (Date.now() > this.messageTimer) {
+            this.ball.updateAnimation();
+            this.goalkeeper.update();
+
+            if (!this.ball.animating && !this.resultMessageShown) {
+                this.resultMessageShown = true;
+                this._displayResultMessage();
+                if (this.pendingResult === 'goal' && this.lastShotPower > 0.85) {
+                    this.renderer.startConfetti();
+                }
+            }
+
+            if (this.resultMessageShown && Date.now() > this.messageTimer) {
                 this._nextShot();
             }
             return;
         }
 
-        if (this.state === STATES.GAME_OVER) {
-            return;
-        }
+        if (this.state === STATES.GAME_OVER) return;
 
         if (Date.now() > this.messageTimer) {
             this.message = '';
@@ -121,7 +152,7 @@ class Game {
 
         switch (this.state) {
             case STATES.READY:
-                this.player.update();
+                this.player.updateRun();
                 this.ball.x = this.player.x;
                 this.ball.y = this.player.y + 30;
                 if (this.player.keys.up) {
@@ -133,7 +164,7 @@ class Game {
                 break;
 
             case STATES.RUNNING:
-                this.player.update();
+                this.player.updateRun();
                 this.ball.x = this.player.x;
                 this.ball.y = this.player.y + 30;
 
@@ -149,128 +180,120 @@ class Game {
                         }
                     }
 
-                    const totalProgress = elapsed / (interval * 3);
-                    if (totalProgress >= 0.83 && !this.arrowShown) {
-                        this.arrowDirection = this.goalkeeper.revealDirection();
-                        this.arrowVisible = true;
-                        this.arrowShown = true;
-                        audioManager._playTone(1200, 0.1, 'sine', 0.4);
-                    }
-
                     if (newCountdown <= 0) {
-                        this.state = STATES.SHOOTING;
-                        this.shootWindowOpen = true;
-                        this.shootWindowStart = Date.now();
-                        this.countdownActive = false;
-                        this.player.enableShooting();
+                        this.state = STATES.AIMING;
+                        this.aimingStartTime = Date.now();
+                        this.powerCharging = false;
+                        this.power = 0;
+                        this.player.resetAim();
                         audioManager._playTone(600, 0.15, 'square', 0.3);
+                        this.countdownActive = false;
                     }
                 }
                 break;
 
-            case STATES.SHOOTING:
-                if (!this.goalkeeperDiving) {
-                    this.goalkeeperDiving = true;
-                    this.goalkeeper.dive();
-                }
+            case STATES.AIMING:
+                this.player.updateAim();
+                this.ball.x = this.player.x;
+                this.ball.y = this.player.y + 30;
 
-                this.goalkeeper.update();
-
-                if (this.shootWindowOpen && Date.now() - this.shootWindowStart > this.shootTimeLimit) {
-                    const elapsed = Date.now() - this.shootWindowStart;
-                    this._resolveShot({ timed: false, direction: null, tooLate: true, elapsed: elapsed });
+                if (Date.now() - this.aimingStartTime > GAME_SETTINGS.aimingTimeLimit) {
+                    this._resolveShot(this.player.aimX, this.player.aimY, 0);
                     break;
                 }
 
-                if (this.shootWindowOpen && this.player.keys.space && this.player.lastDirectionPress) {
-                    const result = this.player.checkShotTiming();
-                    this._resolveShot(result);
+                if (this.player.keys.space) {
+                    if (!this.powerCharging) {
+                        this.powerCharging = true;
+                        this.chargeStartTime = performance.now();
+                        this.power = 0;
+                    }
+                    const elapsed = (performance.now() - this.chargeStartTime) / 1000;
+                    this.power = (Math.sin(elapsed * GAME_SETTINGS.powerOscillateSpeed) + 1) / 2;
+                } else if (this.powerCharging) {
+                    if (performance.now() - this.chargeStartTime >= GAME_SETTINGS.minChargeMs) {
+                        audioManager.playKick();
+                        this._resolveShot(this.player.aimX, this.player.aimY, this.power);
+                    }
+                    this.powerCharging = false;
+                    this.power = 0;
                 }
                 break;
         }
     }
 
-    _resolveShot(result) {
+    _resolveShot(aimX, aimY, power) {
         if (this.shotResolved) return;
         this.shotResolved = true;
-        this.shootWindowOpen = false;
+        this.lastShotPower = power;
 
-        let timingMs = Infinity;
-        let signedTimingMs = 0;
-        let tooEarly = false;
-        if (result && result.direction) {
-            const dirTime = this.player.lastDirectionPress ? this.player.lastDirectionPress.time : 0;
-            const spaceTime = this.player.lastSpacePress || 0;
-            signedTimingMs = dirTime - spaceTime;
-            timingMs = Math.abs(signedTimingMs);
-            tooEarly = signedTimingMs < 0;
-        }
+        const dispersion = GAME_SETTINGS.dispersionMinPx + power * GAME_SETTINGS.dispersionPowerFactor;
+        const actualX = aimX + (Math.random() - 0.5) * dispersion * 2;
+        const actualY = aimY + (Math.random() - 0.5) * dispersion * 2;
 
-        const shotData = {
-            shot: this.shots + 1,
-            timed: result ? result.timed : false,
-            direction: result ? result.direction : null,
-            arrowDirection: this.arrowDirection,
-            signedTimingMs: signedTimingMs,
-            timingMs: timingMs,
-            tooEarly: tooEarly,
-            tooLate: result ? result.tooLate : false,
-            elapsed: result ? result.elapsed : 0,
-            result: 'miss'
-        };
+        const g = GAME_SETTINGS;
 
-        if (!result || !result.timed) {
-            let msg = 'MISTIMED! No direction pressed';
-            if (result && result.tooLate) {
-                msg = `TOO LATE! (+${Math.round(result.elapsed)}ms)`;
-            } else if (result && result.direction && timingMs < 1000) {
-                const dirSymbols = { left: '←', right: '→', down: '↓', up: '↑' };
-                const dirSymbol = dirSymbols[result.direction] || result.direction;
-                if (tooEarly) {
-                    msg = `${dirSymbol} before SPACE! (${Math.round(signedTimingMs)}ms)`;
-                } else {
-                    msg = `SPACE before ${dirSymbol}! (+${Math.round(timingMs)}ms)`;
-                }
-            }
-            audioManager.playBoo();
-            this._showMessage(msg, 'save');
-            shotData.result = 'mistimed';
-            this.ball.x = this.player.x;
-            this.ball.y = this.player.y + 30;
+        let result;
+        let msg;
+        let msgType;
+        let keeperDir = null;
+
+        if (actualX < g.goalLeft || actualX > g.goalRight || actualY < g.goalTop || actualY > g.goalBottom) {
+            if (actualX < g.goalLeft) msg = 'LEFT POST!';
+            else if (actualX > g.goalRight) msg = 'RIGHT POST!';
+            else if (actualY < g.goalTop) msg = 'OVER THE BAR!';
+            else msg = 'WIDE!';
+            result = 'miss';
+            msgType = 'miss';
         } else {
-            const isPerfect = Math.round(signedTimingMs) === 0;
-            const timingStr = isPerfect ? 'PERFECT!' : `(${tooEarly ? '' : '+'}${Math.round(signedTimingMs)}ms)`;
-            const opposite = { left: 'right', right: 'left', up: 'down' };
-            if (result.direction === opposite[this.arrowDirection]) {
-                this.score++;
-                audioManager.playGoal();
-                this._showMessage(`GOAL! ${timingStr}`, 'goal');
-                shotData.result = 'goal';
-                const goalCenterX = GAME_SETTINGS.canvasWidth / 2;
-                if (result.direction === 'left') {
-                    this.ball.x = goalCenterX - 100;
-                } else if (result.direction === 'right') {
-                    this.ball.x = goalCenterX + 100;
-                } else {
-                    this.ball.x = goalCenterX;
-                }
-                this.ball.y = GAME_SETTINGS.goalY + 60;
-                if (isPerfect) {
-                    this.renderer.startConfetti();
-                }
+            keeperDir = this.goalkeeper.chooseDirection();
+            this.goalkeeper.dive(keeperDir);
+            this.goalkeeper.learnFromShot(aimX);
+
+            if (this.goalkeeper.isSaved(actualX, actualY, power)) {
+                const dirName = keeperDir.charAt(0).toUpperCase() + keeperDir.slice(1);
+                msg = `SAVED! Keeper: ${dirName}`;
+                result = 'saved';
+                msgType = 'save';
             } else {
-                audioManager.playSave();
-                audioManager.playBoo();
-                this._showMessage(`SAVED! ${timingStr}`, 'save');
-                shotData.result = 'saved';
-                this.ball.x = this.goalkeeper.x;
-                this.ball.y = this.goalkeeper.y;
+                this.score++;
+                msg = 'GOAL!';
+                result = 'goal';
+                msgType = 'goal';
             }
         }
 
-        this.shotHistory.push(shotData);
+        const ballDuration = result === 'miss'
+            ? GAME_SETTINGS.ballAnimMs * 0.6
+            : GAME_SETTINGS.ballAnimMs;
+
+        if (result === 'miss') {
+            const missX = Math.max(g.goalLeft - 40, Math.min(g.goalRight + 40, actualX));
+            const missY = Math.max(g.goalTop - 40, Math.min(g.goalBottom + 40, actualY));
+            this.ball.startAnimation(missX, missY, ballDuration);
+        } else {
+            this.ball.startAnimation(actualX, actualY, ballDuration);
+        }
+
+        this.pendingResult = result;
+        this.pendingMessage = msg;
+        this.pendingMessageType = msgType;
+        this.resultMessageShown = false;
+
+        const powerZone = this._getZone(aimX);
+        const dirSymbols = { left: '←', right: '→', center: '—' };
+
+        this.shotHistory.push({
+            shot: this.shots + 1,
+            result: result,
+            power: Math.round(power * 100),
+            keeperDir: keeperDir,
+            aimZone: powerZone,
+            aimZoneSymbol: dirSymbols[powerZone],
+            keeperSymbol: keeperDir ? dirSymbols[keeperDir] : '-'
+        });
+
         this.state = STATES.RESULT;
-        this.messageTimer = Date.now() + 1500;
     }
 
     _showFinalResults() {
@@ -284,34 +307,17 @@ class Game {
         resultTitle.textContent = this.score >= GAME_SETTINGS.winScore ? 'YOU WIN!' : 'YOU LOSE!';
         finalScore.textContent = `Goals: ${this.score} / ${this.maxShots}`;
 
-        const dirSymbols = { left: '←', right: '→', down: '↓', up: '↑' };
-        let detailsHTML = '<table class="shot-table"><tr><th>Shot</th><th>Result</th><th>Timing</th></tr>';
+        let detailsHTML = '<table class="shot-table"><tr><th>#</th><th>Result</th><th>Power</th><th>Keeper</th><th>Aim</th></tr>';
         this.shotHistory.forEach((shot) => {
             const resultClass = shot.result === 'goal' ? 'goal-row' : 'fail-row';
-            let timingText = '-';
-            if (shot.result === 'mistimed') {
-                if (shot.tooLate) {
-                    timingText = `Too late (+${Math.round(shot.elapsed || 0)}ms)`;
-                } else if (shot.direction && shot.timingMs < 1000) {
-                    const dirSymbol = dirSymbols[shot.direction] || shot.direction;
-                    if (shot.tooEarly) {
-                        timingText = `${dirSymbol} before SPACE! (${Math.round(shot.signedTimingMs)}ms)`;
-                    } else {
-                        timingText = `SPACE before ${dirSymbol}! (+${Math.round(shot.timingMs)}ms)`;
-                    }
-                } else {
-                    timingText = 'No input';
-                }
-            } else if (Math.round(shot.signedTimingMs) === 0) {
-                timingText = 'PERFECT!';
-            } else if (shot.timingMs !== Infinity && shot.timingMs !== undefined) {
-                const sign = shot.tooEarly ? '' : '+';
-                timingText = `${sign}${Math.round(shot.signedTimingMs)}ms`;
-            }
+            const powerStr = shot.power + '%';
+            const keeperStr = shot.keeperSymbol || '-';
             detailsHTML += `<tr class="${resultClass}">
                 <td>${shot.shot}</td>
-                <td>${shot.result.toUpperCase().replace('_', ' ')}</td>
-                <td>${timingText}</td>
+                <td>${shot.result.toUpperCase()}</td>
+                <td>${powerStr}</td>
+                <td>${keeperStr}</td>
+                <td>${shot.aimZoneSymbol}</td>
             </tr>`;
         });
         detailsHTML += '</table>';
@@ -334,16 +340,11 @@ class Game {
         this.renderer.drawPitch();
         this.renderer.drawGoal();
 
-        if (this.arrowVisible) {
-            const arrowPos = this.goalkeeper.getArrowPosition();
-            this.renderer.drawArrow(this.arrowDirection, arrowPos.x, arrowPos.y, true);
-        }
-
-        this.renderer.drawGoalkeeper(this.goalkeeper.x, this.goalkeeper.y, this.goalkeeper.size, this.goalkeeper.diveDirection);
-
         if (this.player.tigerData) {
             this.renderer.drawTiger(this.player.x, this.player.y, this.player.size, this.player.tigerData);
         }
+
+        this.renderer.drawGoalkeeper(this.goalkeeper.x, this.goalkeeper.y, this.goalkeeper.size, this.goalkeeper.diveDirection);
 
         this.renderer.drawBall(this.ball.x, this.ball.y, this.ball.size);
 
@@ -355,12 +356,14 @@ class Game {
             this._drawPrompt('PRESS ↑ TO RUN FORWARD');
         } else if (this.state === STATES.RUNNING && this.countdown > 0) {
             this._drawCountdown();
-        } else if (this.state === STATES.SHOOTING && this.shootWindowOpen) {
-            const elapsed = Date.now() - this.shootWindowStart;
-            const progress = Math.max(0, 1 - (elapsed / this.shootTimeLimit));
-            this.renderer.drawShootTimer(progress);
-            const shootPrompt = GAME_SETTINGS.hardMode ? '← ↓ → + SPACE NOW!' : '← OR → + SPACE NOW!';
-            this._drawPrompt(shootPrompt);
+        } else if (this.state === STATES.AIMING) {
+            this.renderer.drawCrosshair(this.player.aimX, this.player.aimY);
+            if (this.powerCharging) {
+                this.renderer.drawPowerBar(this.w / 2, this.h - 30, this.power, true);
+                this._drawPromptAt('RELEASE SPACE TO SHOOT!', this.h - 70);
+            } else {
+                this._drawPrompt('AIM: ← → ↑ ↓    HOLD SPACE TO CHARGE');
+            }
         }
     }
 
@@ -370,9 +373,21 @@ class Game {
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.fillStyle = '#FFD700';
-        ctx.font = 'bold 20px monospace';
+        ctx.font = 'bold 16px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(text, GAME_SETTINGS.canvasWidth / 2, GAME_SETTINGS.canvasHeight - 40);
+        ctx.fillText(text, this.w / 2, this.h - 40);
+        ctx.restore();
+    }
+
+    _drawPromptAt(text, y) {
+        const ctx = this.renderer.ctx;
+        const alpha = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 16px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, this.w / 2, y);
         ctx.restore();
     }
 
@@ -382,7 +397,7 @@ class Game {
         ctx.fillStyle = '#FFD700';
         ctx.font = 'bold 60px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(this.countdown, GAME_SETTINGS.canvasWidth / 2, GAME_SETTINGS.canvasHeight / 2);
+        ctx.fillText(this.countdown, this.w / 2, this.h / 2);
         ctx.restore();
     }
 }
